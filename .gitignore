@@ -1,0 +1,9 @@
+.ipynb_checkpoints/
+.idea/
+p2net/__pycache__/
+monodepth2/__pycache__/
+dataset/__pycache__/
+monodepth2/networks/__pycache__/
+p2net/networks/__pycache__/
+stereonet/models/__pycache__/
+
