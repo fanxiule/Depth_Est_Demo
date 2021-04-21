@@ -1,4 +1,4 @@
-#Jupyter Notebook to Run Several Deep Learning-based Depth Estimation Algorithms
+# Jupyter Notebook to Run Several Deep Learning-based Depth Estimation Algorithms
 
 This repo contains jupyter notebooks to run a number of depth estimation 
 algorithm and to visualize the result more easily. The models used in this 
