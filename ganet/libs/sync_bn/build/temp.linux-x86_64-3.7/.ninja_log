@@ -1,0 +1,5 @@
+# ninja log v5
+0	4692	1617634199944841736	/home/xfan/Documents/Avidbots/Current_Approach/depth_estimation/GANet/libs/sync_bn/build/temp.linux-x86_64-3.7/src/cpu/sync_bn.o	ceffcca1c591aa9e
+0	10870	1617634206120759836	/home/xfan/Documents/Avidbots/Current_Approach/depth_estimation/GANet/libs/sync_bn/build/temp.linux-x86_64-3.7/src/cpu/operator.o	c03cbd2d411bc839
+0	9769	1617634216048628340	/home/xfan/Documents/Avidbots/Current_Approach/depth_estimation/GANet/libs/sync_bn/build/temp.linux-x86_64-3.7/src/gpu/sync_bn_cuda.o	4af003738a2a8fdc
+0	11617	1617634217896603885	/home/xfan/Documents/Avidbots/Current_Approach/depth_estimation/GANet/libs/sync_bn/build/temp.linux-x86_64-3.7/src/gpu/operator.o	bab408876b519ebc

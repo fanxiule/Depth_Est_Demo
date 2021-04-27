@@ -2,7 +2,7 @@
 
 This repo contains jupyter notebooks to run a number of depth estimation 
 algorithm and to visualize the result more easily. The models used in this 
-repo includes:
+repo include:
 * 2 monocular depth estimation models
     * [Monodepth2](https://github.com/nianticlabs/monodepth2)
     * [P<sup>2</sup>Net](https://github.com/svip-lab/Indoor-SfMLearner)
@@ -61,7 +61,7 @@ as inputs in the format of `.png`. The `/gt_depth` folder stores the pseudo
 ground truth depth data obtained by the Intel D435 camera in the format of 
 `.csv`. The `/pred_disp` directory contains 6 subfolders. Each subdolder is 
 associated with one of the models and includes the predicted depth/disparity 
-by that model in the form of numpy array `.npy`. Files with the same file indicate 
+by that model in the form of numpy array `.npy`. Files with the same name indicate 
 that they are the sensor outputs/prediction for the same time step. 
 
 ### Running the Notebook
