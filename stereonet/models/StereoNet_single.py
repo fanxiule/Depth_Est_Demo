@@ -134,12 +134,15 @@ class disparityregression(nn.Module):
 
 
 class StereoNet(nn.Module):
-    def __init__(self, k, r, maxdisp=192):
+    def __init__(self, k, r, maxdisp=192, spp=False):
         super().__init__()
         self.maxdisp = maxdisp
         self.k = k
         self.r = r
-        self.feature_extraction = FeatureExtraction(k)
+        if spp:
+            self.feature_extraction = SPPFeatureExtraction(k)
+        else:
+            self.feature_extraction = FeatureExtraction(k)
         self.filter = nn.ModuleList()
         for _ in range(4):
             self.filter.append(
@@ -198,6 +201,119 @@ class StereoNet(nn.Module):
 
         # return pred_pyramid_list
         return pred_pyramid_list
+
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_ch, out_ch, kernel, dilation, downsample=False):
+        super(ResidualBlock, self).__init__()
+        pad = kernel // 2 * dilation
+        if downsample:
+            stride = 2
+            self.downsample = nn.Sequential(
+                nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=1, stride=2, padding=0, bias=False),
+                nn.BatchNorm2d(out_ch))
+        else:
+            stride = 1
+            if in_ch != out_ch:
+                self.downsample = nn.Sequential(
+                    nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=1, stride=1, padding=0, bias=False),
+                    nn.BatchNorm2d(out_ch))
+            else:
+                self.downsample = None
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels=in_ch, out_channels=out_ch, kernel_size=kernel, stride=stride, padding=pad,
+                      dilation=dilation),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True))
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=out_ch, out_channels=out_ch, kernel_size=kernel, stride=1, padding=pad,
+                      dilation=dilation),
+            nn.BatchNorm2d(out_ch)
+        )
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.conv2(out)
+
+        if self.downsample is not None:
+            x = self.downsample(x)
+
+        out += x
+
+        return out
+
+
+class SPPFeatureExtraction(nn.Module):
+    def __init__(self, k):
+        super(SPPFeatureExtraction, self).__init__()
+        self.firstconv = nn.Sequential(convbn(3, 32, 3, 2, 1, 1),
+                                       nn.ReLU(inplace=True),
+                                       convbn(32, 32, 3, 1, 1, 1),
+                                       nn.ReLU(inplace=True),
+                                       convbn(32, 32, 3, 1, 1, 1),
+                                       nn.ReLU(inplace=True))  # output 1/2 resolution
+        self.layer1 = self._make_layer(32, 32, 3, 1, 3, True)  # output 1/4 resolution
+        self.layer2 = self._make_layer(32, 64, 3, 2, 3, True)  # output 1/8 resolution
+        self.layer3 = self._make_layer(64, 128, 3, 4, 3, False)
+
+        self.branch1 = nn.Sequential(nn.AvgPool2d((32, 32), stride=(32, 32)),
+                                     convbn(128, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+        self.branch2 = nn.Sequential(nn.AvgPool2d((16, 16), stride=(16, 16)),
+                                     convbn(128, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+        self.branch3 = nn.Sequential(nn.AvgPool2d((8, 8), stride=(8, 8)),
+                                     convbn(128, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+        self.branch4 = nn.Sequential(nn.AvgPool2d((4, 4), stride=(4, 4)),
+                                     convbn(128, 32, 1, 1, 0, 1),
+                                     nn.ReLU(inplace=True))
+
+        self.lastconv = nn.Sequential(convbn(320, 128, 3, 1, 1, 1),
+                                      nn.ReLU(inplace=True),
+                                      nn.Conv2d(in_channels=128, out_channels=32, kernel_size=1, padding=0, stride=1,
+                                                bias=False))
+
+    def _make_layer(self, in_ch, out_ch, kernel, dilation, num_layers, downsample):
+        layers = []
+        for i in range(0, num_layers):
+            if i == 0:
+                if downsample:
+                    layers.append(ResidualBlock(in_ch, out_ch, kernel, dilation, True))
+                else:
+                    layers.append(ResidualBlock(in_ch, out_ch, kernel, dilation, False))
+            else:
+                layers.append(ResidualBlock(out_ch, out_ch, kernel, dilation, False))
+        layer = nn.Sequential(*layers)
+        return layer
+
+    def forward(self, x):
+        output = self.firstconv(x)
+        output = self.layer1(output)
+        output_skip_1 = self.layer2(output)
+        output_skip_2 = self.layer3(output_skip_1)
+
+        output_branch1 = self.branch1(output_skip_2)
+        output_branch1 = F.interpolate(output_branch1, size=(output_skip_2.size()[2], output_skip_2.size()[3]),
+                                       mode='bilinear', align_corners=False)
+
+        output_branch2 = self.branch1(output_skip_2)
+        output_branch2 = F.interpolate(output_branch2, size=(output_skip_2.size()[2], output_skip_2.size()[3]),
+                                       mode='bilinear', align_corners=False)
+
+        output_branch3 = self.branch1(output_skip_2)
+        output_branch3 = F.interpolate(output_branch3, size=(output_skip_2.size()[2], output_skip_2.size()[3]),
+                                       mode='bilinear', align_corners=False)
+
+        output_branch4 = self.branch1(output_skip_2)
+        output_branch4 = F.interpolate(output_branch4, size=(output_skip_2.size()[2], output_skip_2.size()[3]),
+                                       mode='bilinear', align_corners=False)
+
+        output_feat = torch.cat(
+            (output_skip_1, output_skip_2, output_branch4, output_branch3, output_branch2, output_branch1), dim=1)
+        output_feat = self.lastconv(output_feat)
+        return output_feat
 
 
 if __name__ == '__main__':
